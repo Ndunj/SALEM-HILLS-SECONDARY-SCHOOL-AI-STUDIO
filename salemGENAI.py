@@ -25,11 +25,6 @@ st.logo('salemlogo.png')
 with st.sidebar:
     st.header("Configuration")
 
-    # Securely input API key
-    api_key_input = st.text_input("Enter Gemini API Key:", type="password", help="Get your key from Google AI Studio")
-
-    st.divider()
-
     # Core Switcher: Text Chat vs. Image Generator
     app_mode = st.radio("Select App Mode:", ("💬 Text Chat", "🎨 Image Generator"))
 
@@ -54,8 +49,12 @@ with st.sidebar:
         st.session_state.messages = []
         st.rerun()
 
-# Determine the API key to use
-api_key = api_key_input if api_key_input else None
+# --- NEW SECURE KEY HANDLING ---
+# Checks the dashboard secrets first. If not found, it keeps things from crashing.
+if "GEMINI_API_KEY" in st.secrets:
+    api_key = st.secrets["GEMINI_API_KEY"]
+else:
+    api_key = None
 
 # -----------------------------------------------------------------------------
 # 3. Initialize Single AI Client & Chat History
