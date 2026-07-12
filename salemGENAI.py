@@ -8,8 +8,8 @@ import io
 # 1. Page Configuration & Title
 # -----------------------------------------------------------------------------
 st.set_page_config(page_title="SALEM GENAI", page_icon="ðŸ¤–", layout="centered")
-#st.title("SALEMHILLS AI")
-# --- ADDED: Main Page Layout with Logo ---
+
+# --- Main Page Layout with Logo ---
 col1, col2 = st.columns([1, 4]) # Creates a small column for the logo, larger for text
 
 with col1:
@@ -18,7 +18,6 @@ with col1:
 with col2:
     st.title("SALEM HILLS INT'L SCHOOL AI Studio")
 st.logo('salemlogo.png')
-#st.caption("UGO'S AI FOR EDUCATION")
 
 # -----------------------------------------------------------------------------
 # 2. Sidebar Configuration
@@ -45,7 +44,7 @@ with st.sidebar:
     else:
         st.subheader("Image Mode Settings")
         aspect_ratio = st.selectbox(
- "Aspect Ratio:",
+            "Aspect Ratio:",
             ("1:1", "16:9", "9:16", "4:3", "3:4"),
             index=0
         )
@@ -88,8 +87,6 @@ placeholder_text = "Describe the image you want to create..." if app_mode == "ðŸ
 if user_input := st.chat_input(placeholder_text):
 
     if not api_key:
-        st.warning("Please provide a valid Gemini API Key in the sidebar to start.")
- if not api_key:
         st.warning("Please provide a valid Gemini API Key in the sidebar to start.")
         st.stop()
 
@@ -136,7 +133,7 @@ if user_input := st.chat_input(placeholder_text):
                 # Call Gemini's native image generation configuration
                 response = client.models.generate_content(
                     model="gemini-2.5-flash-image",
- contents=user_input,
+                    contents=user_input,
                     config=types.GenerateContentConfig(
                         response_modalities=["IMAGE"],
                         image_config=types.ImageConfig(
