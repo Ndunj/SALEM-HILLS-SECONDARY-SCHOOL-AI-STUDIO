@@ -103,7 +103,7 @@ if app_mode == "💬 Text Chat":
                 "by clicking the 'Download Chat as PDF' button in the sidebar on the left!"
             )
         )
-    else:
+else:
         st.subheader("Image Mode Settings")
         aspect_ratio = st.selectbox(
             "Aspect Ratio:",
