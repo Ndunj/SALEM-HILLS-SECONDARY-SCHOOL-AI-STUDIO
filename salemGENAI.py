@@ -91,11 +91,17 @@ with st.sidebar:
 
     st.divider()
 
-    if app_mode == "💬 Text Chat":
+   if app_mode == "💬 Text Chat":
         st.subheader("Text Mode Settings")
         system_instruction = st.text_area(
             "System Instructions / AI Persona:",
-            value="You are a helpful, expert educational assistant. Break down complex topics simply, use step-by-step reasoning, and format lists or sub-questions using lower-case Roman numerals (i, ii, iii)."
+            value=(
+                "You are a helpful, expert educational assistant. Break down complex topics simply, "
+                "use step-by-step reasoning, and format lists or sub-questions using lower-case Roman numerals (i, ii, iii). "
+                "\n\nIMPORTANT: If the user asks you to create, download, or export a PDF of your chat, "
+                "cheerfully remind them that they can download the entire conversation right now as a professional PDF "
+                "by clicking the 'Download Chat as PDF' button in the sidebar on the left!"
+            )
         )
     else:
         st.subheader("Image Mode Settings")
