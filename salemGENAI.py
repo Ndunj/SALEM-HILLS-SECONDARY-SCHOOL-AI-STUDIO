@@ -91,7 +91,7 @@ with st.sidebar:
 
     st.divider()
 
-   if app_mode == "💬 Text Chat":
+if app_mode == "💬 Text Chat":
         st.subheader("Text Mode Settings")
         system_instruction = st.text_area(
             "System Instructions / AI Persona:",
