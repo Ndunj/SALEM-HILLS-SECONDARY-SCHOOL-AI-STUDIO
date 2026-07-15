@@ -113,21 +113,26 @@ with st.sidebar:
     st.divider()
     
     # --- DYNAMIC PDF DOWNLOAD BUTTON ---
-    # Only offer download in Text Mode and when a conversation history exists
-    if app_mode == "💬 Text Chat" and st.session_state.get("messages"):
+    if app_mode == "💬 Text Chat":
         st.subheader("Export Conversation")
+        # Check if we actually have messages to download
+        has_messages = len(st.session_state.get("messages", [])) > 0
+        
         try:
-            pdf_bytes = generate_pdf(st.session_state.messages)
+            # Only generate the PDF if there are active messages
+            pdf_bytes = generate_pdf(st.session_state.messages) if has_messages else b""
+            
             st.download_button(
                 label="📥 Download Chat as PDF",
                 data=pdf_bytes,
                 file_name="salem_hills_ai_transcript.pdf",
-                mime="application/pdf"
+                mime="application/pdf",
+                disabled=not has_messages, # This gray-outs the button if empty!
+                help="Start a chat first to download the transcript." if not has_messages else "Click to download this chat as a PDF"
             )
         except Exception as e:
             st.error(f"Could not prepare PDF: {e}")
         st.divider()
-
     if st.button("Clear App History / Cache"):
         st.session_state.messages = []
         st.rerun()
