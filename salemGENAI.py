@@ -3,25 +3,86 @@ from google import genai
 from google.genai import types
 from PIL import Image
 import io
+# --- NEW IMPORT ---
+# Run: pip install fpdf2
+from fpdf import FPDF 
 
-# -----------------------------------------------------------------------------
+-----------------------------------------------------------------------------
 # 1. Page Configuration & Title
-# -----------------------------------------------------------------------------
+-----------------------------------------------------------------------------
 st.set_page_config(page_title="SALEM GENAI", page_icon="🤖", layout="centered")
 
 # --- Main Page Layout with Logo ---
 col1, col2 = st.columns([1, 4]) # Creates a small column for the logo, larger for text
-
 with col1:
-    st.image("salemlogo.png", width=80) # Explicit width looks best for titles
-
+    try:
+        st.image("salemlogo.png", width=80) # Explicit width looks best for titles
+    except Exception:
+        # Fallback if logo file is not locally present yet
+        st.write("🏫")
 with col2:
     st.title("SALEM HILLS INT'L SCHOOL AI Studio")
-st.logo('salemlogo.png')
 
-# -----------------------------------------------------------------------------
+try:
+    st.logo('salemlogo.png')
+except Exception:
+    pass
+
+-----------------------------------------------------------------------------
+# PDF Generation Helper Functions
+-----------------------------------------------------------------------------
+def clean_text_for_pdf(text: str) -> str:
+    """Replaces common non-Latin-1 characters to prevent PDF generation errors."""
+    replacements = {
+        '\u201c': '"', '\u201d': '"',  # Smart double quotes
+        '\u2018': "'", '\u2019': "'",  # Smart single quotes
+        '\u2013': '-', '\u2014': '-',  # En/Em dashes
+        '\u2022': '*',                  # Bullet points
+    }
+    for original, replacement in replacements.items():
+        text = text.replace(original, replacement)
+    # Encode and decode back, replacing any remaining un-renderable characters with '?'
+    return text.encode('latin-1', 'replace').decode('latin-1')
+
+def generate_pdf(messages) -> bytes:
+    """Generates a clean PDF binary stream from the session chat messages."""
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    
+    # Title / Header
+    pdf.set_font("Helvetica", style="B", size=16)
+    pdf.cell(0, 10, txt="SALEM HILLS INT'L SCHOOL", ln=True, align="C")
+    pdf.set_font("Helvetica", style="I", size=10)
+    pdf.cell(0, 5, txt="AI Studio - Chat Session Transcript", ln=True, align="C")
+    pdf.ln(10)
+    
+    # Divider line
+    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.ln(5)
+    
+    # Render messages
+    for msg in messages:
+        role = "Student / User" if msg["role"] == "user" else "AI Assistant"
+        
+        # Format Role Name
+        pdf.set_font("Helvetica", style="B", size=11)
+        pdf.cell(0, 8, txt=f"{role}:", ln=True)
+        
+        # Format Message Content
+        pdf.set_font("Helvetica", size=10)
+        cleaned_content = clean_text_for_pdf(msg["content"])
+        
+        # multi_cell automatically wraps text at the margins
+        pdf.multi_cell(0, 5, txt=cleaned_content)
+        pdf.ln(6)
+        
+    # Return PDF raw bytes
+    return pdf.output()
+
+-----------------------------------------------------------------------------
 # 2. Sidebar Configuration
-# -----------------------------------------------------------------------------
+-----------------------------------------------------------------------------
 with st.sidebar:
     st.header("Configuration")
 
@@ -45,20 +106,36 @@ with st.sidebar:
         )
 
     st.divider()
+    
+    # --- DYNAMIC PDF DOWNLOAD BUTTON ---
+    # Only offer download in Text Mode and when a conversation history exists
+    if app_mode == "💬 Text Chat" and st.session_state.get("messages"):
+        st.subheader("Export Conversation")
+        try:
+            pdf_bytes = generate_pdf(st.session_state.messages)
+            st.download_button(
+                label="📥 Download Chat as PDF",
+                data=pdf_bytes,
+                file_name="salem_hills_ai_transcript.pdf",
+                mime="application/pdf"
+            )
+        except Exception as e:
+            st.error(f"Could not prepare PDF: {e}")
+        st.divider()
+
     if st.button("Clear App History / Cache"):
         st.session_state.messages = []
         st.rerun()
 
-# --- NEW SECURE KEY HANDLING ---
-# Checks the dashboard secrets first. If not found, it keeps things from crashing.
+# --- SECURE KEY HANDLING ---
 if "GEMINI_API_KEY" in st.secrets:
     api_key = st.secrets["GEMINI_API_KEY"]
 else:
     api_key = None
 
-# -----------------------------------------------------------------------------
+-----------------------------------------------------------------------------
 # 3. Initialize Single AI Client & Chat History
-# -----------------------------------------------------------------------------
+-----------------------------------------------------------------------------
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -70,23 +147,22 @@ if api_key:
     except Exception as e:
         st.error(f"Failed to initialize AI client: {e}")
 
-# -----------------------------------------------------------------------------
+-----------------------------------------------------------------------------
 # 4. Render Existing Chat History (Only displayed in Text Mode)
-# -----------------------------------------------------------------------------
+-----------------------------------------------------------------------------
 if app_mode == "💬 Text Chat":
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-# -----------------------------------------------------------------------------
+-----------------------------------------------------------------------------
 # 5. Handle User Input & Generation Logic
-# -----------------------------------------------------------------------------
+-----------------------------------------------------------------------------
 placeholder_text = "Describe the image you want to create..." if app_mode == "🎨 Image Generator" else "Ask me anything..."
-
 if user_input := st.chat_input(placeholder_text):
 
     if not api_key:
-        st.warning("Please provide a valid Gemini API Key in the sidebar to start.")
+        st.warning("Please provide a valid Gemini API Key in the sidebar secrets configuration to start.")
         st.stop()
 
     # --- MODE A: TEXT CHAT MODE ---
@@ -117,6 +193,8 @@ if user_input := st.chat_input(placeholder_text):
                 response = chat.send_message(user_input)
                 message_placeholder.markdown(response.text)
                 st.session_state.messages.append({"role": "assistant", "content": response.text})
+                # Trigger quick rerun to refresh the sidebar so the PDF download button immediately detects the update
+                st.rerun()
             except Exception as e:
                 st.error(f"An error occurred: {e}")
 
