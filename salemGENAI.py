@@ -3,13 +3,12 @@ from google import genai
 from google.genai import types
 from PIL import Image
 import io
-# --- NEW IMPORT ---
 # Run: pip install fpdf2
 from fpdf import FPDF 
 
-#-----------------------------------------------------------------------------
+# =============================================================================
 # 1. Page Configuration & Title
-#-----------------------------------------------------------------------------
+# =============================================================================
 st.set_page_config(page_title="SALEM GENAI", page_icon="🤖", layout="centered")
 
 # --- Main Page Layout with Logo ---
@@ -28,9 +27,9 @@ try:
 except Exception:
     pass
 
-#-----------------------------------------------------------------------------
+# =============================================================================
 # PDF Generation Helper Functions
-#-----------------------------------------------------------------------------
+# =============================================================================
 def clean_text_for_pdf(text: str) -> str:
     """Replaces common non-Latin-1 characters to prevent PDF generation errors."""
     replacements = {
@@ -80,9 +79,9 @@ def generate_pdf(messages) -> bytes:
     # Return PDF raw bytes
     return pdf.output()
 
-#-----------------------------------------------------------------------------
+# =============================================================================
 # 2. Sidebar Configuration
-#-----------------------------------------------------------------------------
+# =============================================================================
 with st.sidebar:
     st.header("Configuration")
 
@@ -91,7 +90,7 @@ with st.sidebar:
 
     st.divider()
 
-if app_mode == "💬 Text Chat":
+    if app_mode == "💬 Text Chat":
         st.subheader("Text Mode Settings")
         system_instruction = st.text_area(
             "System Instructions / AI Persona:",
@@ -103,7 +102,7 @@ if app_mode == "💬 Text Chat":
                 "by clicking the 'Download Chat as PDF' button in the sidebar on the left!"
             )
         )
-else:
+    else:
         st.subheader("Image Mode Settings")
         aspect_ratio = st.selectbox(
             "Aspect Ratio:",
@@ -139,9 +138,9 @@ if "GEMINI_API_KEY" in st.secrets:
 else:
     api_key = None
 
-#-----------------------------------------------------------------------------
+# =============================================================================
 # 3. Initialize Single AI Client & Chat History
-#-----------------------------------------------------------------------------
+# =============================================================================
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -153,17 +152,17 @@ if api_key:
     except Exception as e:
         st.error(f"Failed to initialize AI client: {e}")
 
-#-----------------------------------------------------------------------------
+# =============================================================================
 # 4. Render Existing Chat History (Only displayed in Text Mode)
-#-----------------------------------------------------------------------------
+# =============================================================================
 if app_mode == "💬 Text Chat":
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-#-----------------------------------------------------------------------------
+# =============================================================================
 # 5. Handle User Input & Generation Logic
-#-----------------------------------------------------------------------------
+# =============================================================================
 placeholder_text = "Describe the image you want to create..." if app_mode == "🎨 Image Generator" else "Ask me anything..."
 if user_input := st.chat_input(placeholder_text):
 
