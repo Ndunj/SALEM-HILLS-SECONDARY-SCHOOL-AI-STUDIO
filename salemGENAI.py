@@ -221,7 +221,7 @@ if user_input := st.chat_input(placeholder_text):
                 st.error(f"An error occurred: {e}")
 
     '''# --- MODE B: NATIVE IMAGE GENERATION MODE ---
-    elif app_mode == "🎨 Image Generator":
+ #  elif app_mode == "🎨 Image Generator":
         with st.chat_message("user"):
             st.markdown(f"**Generate Image for:** *{user_input}*")
 
