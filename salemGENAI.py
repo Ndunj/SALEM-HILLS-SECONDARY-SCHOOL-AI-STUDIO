@@ -98,7 +98,7 @@ with st.sidebar:
     st.header("Configuration")
 
     # Core Switcher: Text Chat vs. Image Generator
-    app_mode = st.radio("Select App Mode:", ("💬 Text Chat", #"🎨 Image Generator"))
+    app_mode = st.radio("Select App Mode:", ("💬 Text Chat"))#, "🎨 Image Generator"))
 
     st.divider()
 
