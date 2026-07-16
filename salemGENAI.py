@@ -43,8 +43,9 @@ def clean_text_for_pdf(text: str) -> str:
     # Encode and decode back, replacing any remaining un-renderable characters with '?'
     return text.encode('latin-1', 'replace').decode('latin-1')
 
+
 def generate_pdf(messages) -> bytes:
-    """Generates a clean PDF binary stream from the session chat messages."""
+    """Generates a clean PDF containing only core material, filtering out chatbot meta-dialogue."""
     pdf = FPDF()
     pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=15)
@@ -53,15 +54,28 @@ def generate_pdf(messages) -> bytes:
     pdf.set_font("Helvetica", style="B", size=16)
     pdf.cell(0, 10, txt="SALEM HILLS INT'L SCHOOL", ln=True, align="C")
     pdf.set_font("Helvetica", style="I", size=10)
-    pdf.cell(0, 5, txt="AI Studio - Chat Session Transcript", ln=True, align="C")
+    pdf.cell(0, 5, txt="AI Studio - Official Transcript", ln=True, align="C")
     pdf.ln(10)
     
     # Divider line
     pdf.line(10, pdf.get_y(), 200, pdf.get_y())
     pdf.ln(5)
     
-    # Render messages
+    # Phrasing signatures to filter out of the final document
+    noise_phrases = [
+        "download chat as pdf", 
+        "look for the button", 
+        "in the sidebar on the left", 
+        "within this chat interface"
+    ]
+    
     for msg in messages:
+        # Check if this specific block is mostly chatbot meta-dialogue about download instructions
+        content_lower = msg["content"].lower()
+        if any(phrase in content_lower for phrase in noise_phrases) and len(msg["content"]) < 400:
+            # Skip rendering this message completely if it's just the AI explaining the sidebar button
+            continue
+            
         role = "Student / User" if msg["role"] == "user" else "AI Assistant"
         
         # Format Role Name
@@ -72,14 +86,10 @@ def generate_pdf(messages) -> bytes:
         pdf.set_font("Helvetica", size=10)
         cleaned_content = clean_text_for_pdf(msg["content"])
         
-        # multi_cell automatically wraps text at the margins
         pdf.multi_cell(0, 5, txt=cleaned_content)
         pdf.ln(6)
         
-    # CONVERT TO BYTES: Fixes the 'bytearray' error for Streamlit's download button
-    return bytes(pdf.output())    
-     
-       
+    return bytes(pdf.output())
 
 # =============================================================================
 # 2. Sidebar Configuration
