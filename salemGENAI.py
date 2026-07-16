@@ -180,7 +180,7 @@ if app_mode == "💬 Text Chat":
 # =============================================================================
 # 5. Handle User Input & Generation Logic
 # =============================================================================
-placeholder_text = "Describe the image you want to create..." if app_mode == "🎨 Image Generator" else "Ask me anything..."
+placeholder_text = "Describe the image you want to create..." if app_mode == "🎨 Image Generator" else "Ask SALEM anything..."
 if user_input := st.chat_input(placeholder_text):
 
     if not api_key:
