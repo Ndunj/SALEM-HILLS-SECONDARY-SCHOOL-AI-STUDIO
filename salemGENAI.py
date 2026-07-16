@@ -98,7 +98,7 @@ with st.sidebar:
     st.header("Configuration")
 
     # Core Switcher: Text Chat vs. Image Generator
-    app_mode = st.radio("Select App Mode:", ("💬 Text Chat"))#, "🎨 Image Generator"))
+    app_mode = st.radio("Select App Mode:", ("💬 Text Chat",))#, "🎨 Image Generator"))
 
     st.divider()
 
@@ -204,15 +204,19 @@ if user_input := st.chat_input(placeholder_text):
         with st.chat_message("assistant"):
             message_placeholder = st.empty()
             try:
-                chat = client.chats.create(
-                    model="gemini-2.5-flash",
-                    config=types.GenerateContentConfig(
-                        system_instruction=system_instruction,
-                        temperature=0.7,
-                    ),
-                    history=formatted_history
-                )
-                response = chat.send_message(user_input)
+                # Wrap the processing and API call in a spinner
+                with st.spinner("Processing your response..."):
+                    chat = client.chats.create(
+                        model="gemini-2.5-flash",
+                        config=types.GenerateContentConfig(
+                            system_instruction=system_instruction,
+                            temperature=0.7,
+                        ),
+                        history=formatted_history
+                    )
+                    response = chat.send_message(user_input)
+                
+                # Once the spinner block is exited, write the response and refresh
                 message_placeholder.markdown(response.text)
                 st.session_state.messages.append({"role": "assistant", "content": response.text})
                 # Trigger quick rerun to refresh the sidebar so the PDF download button immediately detects the update
