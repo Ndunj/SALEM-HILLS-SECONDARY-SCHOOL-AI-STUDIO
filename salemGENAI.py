@@ -20,7 +20,7 @@ with col1:
         # Fallback if logo file is not locally present yet
         st.write("🏫")
 with col2:
-    st.title("SALEM HILLS INT'L SCHOOL AI Studio")
+    st.title("SALEM HILLS INT'L SCHOOL AI")
 
 try:
     st.logo('salemlogo.png')
@@ -221,7 +221,7 @@ if user_input := st.chat_input(placeholder_text):
                 st.error(f"An error occurred: {e}")
 
     # --- MODE B: NATIVE IMAGE GENERATION MODE ---
-    elif app_mode == "🎨 Image Generator":
+   ''' elif app_mode == "🎨 Image Generator":
         with st.chat_message("user"):
             st.markdown(f"**Generate Image for:** *{user_input}*")
 
@@ -254,4 +254,4 @@ if user_input := st.chat_input(placeholder_text):
                     st.warning("No image payload returned. Check your description or content filters.")
 
             except Exception as e:
-                st.error(f"Failed to generate image: {e}")
+                st.error(f"Failed to generate image: {e}")'''
