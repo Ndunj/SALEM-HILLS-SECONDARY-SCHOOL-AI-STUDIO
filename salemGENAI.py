@@ -76,8 +76,10 @@ def generate_pdf(messages) -> bytes:
         pdf.multi_cell(0, 5, txt=cleaned_content)
         pdf.ln(6)
         
-    # Return PDF raw bytes
-    return pdf.output()
+    # CONVERT TO BYTES: Fixes the 'bytearray' error for Streamlit's download button
+    return bytes(pdf.output())    
+     
+       
 
 # =============================================================================
 # 2. Sidebar Configuration
