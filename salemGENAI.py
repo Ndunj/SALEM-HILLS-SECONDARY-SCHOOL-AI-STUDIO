@@ -224,8 +224,8 @@ if user_input := st.chat_input(placeholder_text):
             except Exception as e:
                 st.error(f"An error occurred: {e}")
 
-    '''# --- MODE B: NATIVE IMAGE GENERATION MODE ---
- #  elif app_mode == "🎨 Image Generator":
+    # --- MODE B: NATIVE IMAGE GENERATION MODE ---
+    elif app_mode == "🎨 Image Generator":
         with st.chat_message("user"):
             st.markdown(f"**Generate Image for:** *{user_input}*")
 
@@ -258,4 +258,4 @@ if user_input := st.chat_input(placeholder_text):
                     st.warning("No image payload returned. Check your description or content filters.")
 
             except Exception as e:
-                st.error(f"Failed to generate image: {e}")'''
+                st.error(f"Failed to generate image: {e}")
