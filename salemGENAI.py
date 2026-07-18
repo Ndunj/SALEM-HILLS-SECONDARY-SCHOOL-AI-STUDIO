@@ -30,6 +30,13 @@ st.markdown("""
         white-space: nowrap;
         overflow: hidden;
     }
+    .welcome-text {
+        font-size: 15px;
+        color: #4A4A4A;
+        font-weight: 500;
+        margin-bottom: -10px;
+        padding-left: 5px;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -106,14 +113,14 @@ def show_auth_portal():
     
     with tab_login:
         with st.form("login_form"):
-            user_input = st.text_input("Username").strip().lower()
+            user_input = st.text_input("Username").strip()
             pass_input = st.text_input("Password", type="password")
             submit_login = st.form_submit_button("Sign In", use_container_width=True, type="primary")
             
             if submit_login:
                 if verify_user(user_input, pass_input):
                     st.session_state.authenticated = True
-                    st.session_state.username = user_input
+                    st.session_state.username = user_input.strip()
                     st.success("Access Granted! Loading your workspace...")
                     st.rerun()
                 else:
@@ -121,7 +128,7 @@ def show_auth_portal():
                     
     with tab_signup:
         with st.form("signup_form"):
-            new_user = st.text_input("Choose Username").strip().lower()
+            new_user = st.text_input("Choose Username").strip()
             new_pass = st.text_input("Choose Password", type="password")
             confirm_pass = st.text_input("Confirm Password", type="password")
             submit_signup = st.form_submit_button("Create My Account", use_container_width=True)
@@ -146,7 +153,8 @@ if not st.session_state.authenticated:
 # =============================================================================
 # 4. User-Isolated Persistent File History Helpers
 # =============================================================================
-HISTORY_FILE = f"query_history_{st.session_state.username}.txt"
+# Force history filename to use lowercase variant to ensure consistency
+HISTORY_FILE = f"query_history_{st.session_state.username.lower()}.txt"
 
 def save_query_to_file(query_text: str):
     clean_query = query_text.replace("\n", " ").strip()
@@ -345,6 +353,11 @@ if app_mode == "💬 Text Chat":
             render_copy_button(raw_text, f"hist_{idx}")
 
     uploaded_doc = st.file_uploader("Attach a document (.txt, .pdf, or .docx)", type=["txt", "pdf", "docx"], label_visibility="collapsed")
+    
+    # --- DYNAMIC PERSONALIZED GREETING INJECTOR ---
+    greeting_str = f"Hi, {st.session_state.username}, how do we begin today?"
+    st.markdown(f'<p class="welcome-text">{greeting_str}</p>', unsafe_allow_html=True)
+    
     user_input = st.chat_input("Ask SALEM anything...")
 
     if st.session_state.input_value and not user_input:
