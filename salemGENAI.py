@@ -5,19 +5,16 @@ from google.genai import types
 from PIL import Image
 import io
 import json
+import os
 from fpdf import FPDF 
 import pypdf
 import docx
-# from docx.shared import Inches, Pt
-# from docx.oxml import OxmlElement, parse_xml
-# from docx.oxml.ns import qn, nsdecls
 
 # =============================================================================
 # 1. Page Configuration & Title
 # =============================================================================
 st.set_page_config(page_title="SALEM GENAI", page_icon="🤖", layout="centered")
 
-# --- CSS Styling for Layout Elements ---
 st.markdown("""
     <style>
     .copy-container-wrapper {
@@ -34,26 +31,78 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- Main Page Layout with Logo ---
-col1, col2 = st.columns([1, 4]) 
-with col1:
-    try:
-        st.image("salemlogo.png", width=80) 
-    except Exception:
-        st.write("🏫")
-with col2:
-    st.title("SALEM HILLS INT'L SCHOOL AI")
+# =============================================================================
+# 2. Lightweight Authentication Guard
+# =============================================================================
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+if "username" not in st.session_state:
+    st.session_state.username = ""
 
-try:
-    st.logo('salemlogo.png')
-except Exception:
-    pass
+def check_credentials(username, password):
+    """Validates entered credentials against Streamlit secrets safely."""
+    if "credentials" in st.secrets:
+        if username in st.secrets["credentials"] and st.secrets["credentials"][username] == password:
+            return True
+    # Fallback default user for instant local testing if secrets are missing
+    elif username == "admin" and password == "salem":
+        return True
+    return False
+
+def show_login_screen():
+    """Renders a centered, clean login portal form layout."""
+    st.markdown("<h2 style='text-align: center;'>🏫 SALEM HILLS INT'L SCHOOL AI Portal</h2>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: grey;'>Please authenticate to access the AI workspace.</p>", unsafe_allow_html=True)
+    
+    # We use a standard form container to prevent the page from refreshing on every keystroke
+    with st.form("login_form", clear_on_submit=False):
+        user_input = st.text_input("Username")
+        pass_input = st.text_input("Password", type="password")
+        submit_btn = st.form_submit_button("Log In", use_container_width=True, type="primary")
+        
+        if submit_btn:
+            if check_credentials(user_input, pass_input):
+                st.session_state.authenticated = True
+                st.session_state.username = user_input
+                st.success("Access Granted! Loading workspace...")
+                st.rerun()
+            else:
+                st.error("Invalid Username or Password. Please try again.")
+
+# --- The Firewall Gate ---
+if not st.session_state.authenticated:
+    show_login_screen()
+    st.stop()  # Strictly stops running the rest of the file until authorized!
+
+# =============================================================================
+# 3. User-Isolated Persistent File History Helpers
+# =============================================================================
+# Dynamically locks history file paths to the specific authenticated username
+HISTORY_FILE = f"query_history_{st.session_state.username}.txt"
+
+def save_query_to_file(query_text: str):
+    clean_query = query_text.replace("\n", " ").strip()
+    if not clean_query:
+        return
+    existing = load_queries_from_file()
+    if clean_query not in existing:
+        with open(HISTORY_FILE, "a", encoding="utf-8") as f:
+            f.write(clean_query + "\n")
+
+def load_queries_from_file():
+    if not os.path.exists(HISTORY_FILE):
+        return []
+    with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+        return [line.strip() for line in f.readlines() if line.strip()][::-1]
+
+def clear_file_history():
+    if os.path.exists(HISTORY_FILE):
+        os.remove(HISTORY_FILE)
 
 # =============================================================================
 # Helper Functions (PDF, Extraction, Copy Engine)
 # =============================================================================
 def clean_text(text: str) -> str:
-    """Replaces common non-Latin-1 characters to prevent PDF generation errors."""
     replacements = {
         '\u201c': '"', '\u201d': '"', '\u2018': "'", '\u2019': "'",  
         '\u2013': '-', '\u2014': '-', '\u2022': '*',                  
@@ -62,16 +111,7 @@ def clean_text(text: str) -> str:
         text = text.replace(original, replacement)
     return text.encode('latin-1', 'replace').decode('latin-1')
 
-# --- Lesson Plan Helpers Commented Out ---
-# def generate_lesson_plan_pdf(lp: dict) -> bytes:
-#     ...
-# def set_cell_background(cell, fill_hex):
-#     ...
-# def generate_lesson_plan_docx(lp: dict) -> bytes:
-#     ...
-
 def generate_chat_pdf(messages) -> bytes:
-    """Generates a regular transcript conversation log PDF file."""
     pdf = FPDF()
     pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=15)
@@ -89,7 +129,6 @@ def generate_chat_pdf(messages) -> bytes:
     return bytes(pdf.output())
 
 def extract_text_from_file(uploaded_file) -> str:
-    """Extracts text strings from uploaded txt, pdf, and docx variants."""
     if uploaded_file.name.endswith('.txt'):
         return uploaded_file.read().decode("utf-8")
     elif uploaded_file.name.endswith('.pdf'):
@@ -112,7 +151,6 @@ def extract_text_from_file(uploaded_file) -> str:
     return ""
 
 def render_copy_button(text_to_copy: str, element_key: str):
-    """Renders JavaScript powered clipboard functionality inside chat messages."""
     safe_text = text_to_copy.replace('\\', '\\\\').replace('`', '\\`').replace('$', '\\$')
     html_code = f"""
     <div style="display: flex; justify-content: flex-end; font-family: sans-serif;">
@@ -143,14 +181,26 @@ def render_copy_button(text_to_copy: str, element_key: str):
     st.markdown('</div>', unsafe_allow_html=True)
 
 # =============================================================================
-# 3. Memory & Client Configurations
+# 4. Workspace Main Page Layout Setup
 # =============================================================================
+col1, col2 = st.columns([1, 4]) 
+with col1:
+    try:
+        st.image("salemlogo.png", width=80) 
+    except Exception:
+        st.write("🏫")
+with col2:
+    st.title("SALEM HILLS INT'L SCHOOL AI")
+
+try:
+    st.logo('salemlogo.png')
+except Exception:
+    pass
+
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "input_value" not in st.session_state:
     st.session_state.input_value = ""
-# if "current_lesson_plan" not in st.session_state:
-#     st.session_state.current_lesson_plan = None
 
 if "GEMINI_API_KEY" in st.secrets:
     api_key = st.secrets["GEMINI_API_KEY"]
@@ -165,11 +215,21 @@ if api_key:
         st.error(f"Failed to initialize AI client: {e}")
 
 # =============================================================================
-# 4. Sidebar Panels
+# 5. Sidebar Panels (Workspace Mode)
 # =============================================================================
 with st.sidebar:
+    st.markdown(f"👤 Account: **{st.session_state.username}**")
+    
+    # Fully functional logout mechanism
+    if st.button("Log Out", type="secondary", use_container_width=True):
+        st.session_state.authenticated = False
+        st.session_state.username = ""
+        st.session_state.messages = []
+        st.session_state.input_value = ""
+        st.rerun()
+        
+    st.divider()
     st.header("Configuration")
-    # Reduced mode option purely to Text Chat
     app_mode = st.radio("Select App Mode:", ("💬 Text Chat",))
     st.divider()
 
@@ -180,42 +240,34 @@ with st.sidebar:
             value="You are a helpful, expert educational assistant. Break down complex topics simply."
         )
         st.divider()
-        st.subheader("Query History")
-        user_prompts = []
-        for msg in st.session_state.messages:
-            if msg["role"] == "user":
-                clean_string = msg["content"].split("\n\n")[-1] if "📄 *Attached file:" in msg["content"] else msg["content"]
-                if clean_string not in user_prompts:
-                    user_prompts.append(clean_string)
         
-        if user_prompts:
-            for i, prompt in enumerate(user_prompts):
+        st.subheader("Query History")
+        persistent_prompts = load_queries_from_file()
+        
+        if persistent_prompts:
+            for i, prompt in enumerate(persistent_prompts[:20]):
                 short_display = prompt[:30] + "..." if len(prompt) > 30 else prompt
                 if st.button(f"💬 {short_display}", key=f"hist_btn_{i}", use_container_width=True):
                     st.session_state.input_value = prompt
                     st.rerun()
         else:
-            st.info("No queries sent yet.")
+            st.info("No queries saved yet.")
             
         st.divider()
         st.subheader("Export Conversation")
         has_messages = len(st.session_state.messages) > 0
         if st.download_button(label="📥 Download Chat as PDF", data=generate_chat_pdf(st.session_state.messages) if has_messages else b"", file_name="chat_transcript.pdf", mime="application/pdf", disabled=not has_messages):
             st.success("Log Transcribed!")
-            
-    # --- Lesson Plan Generator Sidebar Section Commented Out ---
-    # elif app_mode == "📋 Lesson Plan Generator":
-    #     ...
 
     st.divider()
     if st.button("Clear App History / Cache"):
         st.session_state.messages = []
         st.session_state.input_value = ""
-        # st.session_state.current_lesson_plan = None
+        clear_file_history()
         st.rerun()
 
 # =============================================================================
-# 5. Application Core Context Router
+# 6. Application Core Context Router
 # =============================================================================
 if app_mode == "💬 Text Chat":
     for idx, message in enumerate(st.session_state.messages):
@@ -236,6 +288,8 @@ if app_mode == "💬 Text Chat":
         if not api_key:
             st.warning("Please provide a valid Gemini API Key in the sidebar secrets configuration to start.")
             st.stop()
+        
+        save_query_to_file(user_input)
         
         doc_text = ""
         if uploaded_doc is not None:
@@ -267,7 +321,3 @@ if app_mode == "💬 Text Chat":
                 st.rerun()
             except Exception as e:
                 st.error(f"Error: {e}")
-
-# --- Lesson Plan Generator Core Screen Commented Out ---
-# elif app_mode == "📋 Lesson Plan Generator":
-#     ...
