@@ -3,8 +3,9 @@ from google import genai
 from google.genai import types
 from PIL import Image
 import io
-# Run: pip install fpdf2
 from fpdf import FPDF 
+import pypdf
+import docx
 
 # =============================================================================
 # 1. Page Configuration & Title
@@ -28,7 +29,7 @@ except Exception:
     pass
 
 # =============================================================================
-# PDF Generation Helper Functions
+# PDF Generation & Document Reading Helper Functions
 # =============================================================================
 def clean_text_for_pdf(text: str) -> str:
     """Replaces common non-Latin-1 characters to prevent PDF generation errors."""
@@ -90,6 +91,36 @@ def generate_pdf(messages) -> bytes:
         pdf.ln(6)
         
     return bytes(pdf.output())
+
+
+def extract_text_from_file(uploaded_file) -> str:
+    """Extracts text content from uploaded text, PDF, or Word (.docx) documents."""
+    if uploaded_file.name.endswith('.txt'):
+        return uploaded_file.read().decode("utf-8")
+        
+    elif uploaded_file.name.endswith('.pdf'):
+        try:
+            pdf_reader = pypdf.PdfReader(uploaded_file)
+            text = ""
+            for page in pdf_reader.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text += page_text + "\n"
+            return text
+        except Exception as e:
+            return f"[Error reading PDF content: {e}]"
+            
+    elif uploaded_file.name.endswith('.docx'):
+        try:
+            doc = docx.Document(uploaded_file)
+            text = []
+            for paragraph in doc.paragraphs:
+                text.append(paragraph.text)
+            return "\n".join(text)
+        except Exception as e:
+            return f"[Error reading Word document: {e}]"
+            
+    return ""
 
 # =============================================================================
 # 2. Sidebar Configuration
@@ -180,6 +211,15 @@ if app_mode == "💬 Text Chat":
 # =============================================================================
 # 5. Handle User Input & Generation Logic
 # =============================================================================
+# Document Uploader Segment supporting .txt, .pdf, and .docx
+uploaded_doc = None
+if app_mode == "💬 Text Chat":
+    uploaded_doc = st.file_uploader(
+        "Attach a document (.txt, .pdf, or .docx) to your query:", 
+        type=["txt", "pdf", "docx"], 
+        label_visibility="collapsed"
+    )
+
 placeholder_text = "Describe the image you want to create..." if app_mode == "🎨 Image Generator" else "Ask SALEM anything..."
 if user_input := st.chat_input(placeholder_text):
 
@@ -187,12 +227,25 @@ if user_input := st.chat_input(placeholder_text):
         st.warning("Please provide a valid Gemini API Key in the sidebar secrets configuration to start.")
         st.stop()
 
+    # Process file text if a document is present
+    doc_text = ""
+    if uploaded_doc is not None:
+        with st.spinner("Extracting content from file..."):
+            doc_text = extract_text_from_file(uploaded_doc)
+    
+    # Combine user prompt text and document text if available
+    full_prompt = user_input
+    display_prompt = user_input
+    if doc_text:
+        full_prompt = f"User Message: {user_input}\n\nAttached Document Content:\n{doc_text}"
+        display_prompt = f"📄 *Attached file: {uploaded_doc.name}*\n\n{user_input}"
+
     # --- MODE A: TEXT CHAT MODE ---
     if app_mode == "💬 Text Chat":
         with st.chat_message("user"):
-            st.markdown(user_input)
+            st.markdown(display_prompt)
 
-        st.session_state.messages.append({"role": "user", "content": user_input})
+        st.session_state.messages.append({"role": "user", "content": display_prompt})
 
         formatted_history = []
         for msg in st.session_state.messages[:-1]:
@@ -214,7 +267,8 @@ if user_input := st.chat_input(placeholder_text):
                         ),
                         history=formatted_history
                     )
-                    response = chat.send_message(user_input)
+                    # Send the full prompt containing document text to Gemini
+                    response = chat.send_message(full_prompt)
                 
                 # Once the spinner block is exited, write the response and refresh
                 message_placeholder.markdown(response.text)
