@@ -1,24 +1,5 @@
 # SALEM-HILLS-SECONDARY-SCHOOL-AI-STUDIO
----
-title: My Math App
-emoji: 🧮
-colorFrom: blue
-colorTo: indigo
-sdk: streamlit
-sdk_version: 1.35.0
-app_file: salemGENAI.py
-pinned: false
----
----
-title: SALEM GENAI
-emoji: 🤖
-colorFrom: blue
-colorTo: slate
-sdk: streamlit
-sdk_version: 1.35.0
-app_file: app.py
-pinned: false
----
+
 
 # 🏫 SALEM HILLS INT'L SCHOOL AI STUDIO
 
