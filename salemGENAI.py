@@ -6,12 +6,14 @@ from PIL import Image
 import io
 import json
 import os
+import sqlite3
+import hashlib
 from fpdf import FPDF 
 import pypdf
 import docx
 
 # =============================================================================
-# 1. Page Configuration & Title
+# 1. Page Configuration & Custom Styles
 # =============================================================================
 st.set_page_config(page_title="SALEM GENAI", page_icon="🤖", layout="centered")
 
@@ -32,52 +34,118 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =============================================================================
-# 2. Lightweight Authentication Guard
+# 2. Database Initialization (Lightweight User Storage)
+# =============================================================================
+DB_FILE = "users.db"
+
+def init_db():
+    """Creates the users table if it doesn't already exist."""
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            username TEXT PRIMARY KEY,
+            password_hash TEXT NOT NULL
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+def hash_password(password: str) -> str:
+    """Helper to encrypt passwords securely before saving to database."""
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def create_user(username, password):
+    """Inserts a new user into the database securely."""
+    username = username.strip().lower()
+    if not username or not password:
+        return False, "Username and password cannot be empty."
+    
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    try:
+        c.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)", 
+                  (username, hash_password(password)))
+        conn.commit()
+        return True, "Account created successfully! Please log in."
+    except sqlite3.IntegrityError:
+        return False, "Username already exists. Please choose another one."
+    finally:
+        conn.close()
+
+def verify_user(username, password):
+    """Checks credentials against the stored records."""
+    username = username.strip().lower()
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("SELECT password_hash FROM users WHERE username = ?", (username,))
+    row = c.fetchone()
+    conn.close()
+    
+    if row and row[0] == hash_password(password):
+        return True
+    return False
+
+# Trigger database generation setup
+init_db()
+
+# =============================================================================
+# 3. Dynamic Authentication Portal Layout
 # =============================================================================
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 if "username" not in st.session_state:
     st.session_state.username = ""
 
-def check_credentials(username, password):
-    """Validates entered credentials against Streamlit secrets safely."""
-    if "credentials" in st.secrets:
-        if username in st.secrets["credentials"] and st.secrets["credentials"][username] == password:
-            return True
-    # Fallback default user for instant local testing if secrets are missing
-    elif username == "admin" and password == "salem":
-        return True
-    return False
-
-def show_login_screen():
-    """Renders a centered, clean login portal form layout."""
-    st.markdown("<h2 style='text-align: center;'>🏫 SALEM HILLS INT'L SCHOOL AI Portal</h2>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: grey;'>Please authenticate to access the AI workspace.</p>", unsafe_allow_html=True)
+def show_auth_portal():
+    """Renders a clean tabbed UI for Login vs Registration."""
+    st.markdown("<h2 style='text-align: center;'>🏫 SALEM HILLS INT'L SCHOOL AI</h2>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: grey;'>Authenticate or sign up below to enter the workspace.</p>", unsafe_allow_html=True)
     
-    # We use a standard form container to prevent the page from refreshing on every keystroke
-    with st.form("login_form", clear_on_submit=False):
-        user_input = st.text_input("Username")
-        pass_input = st.text_input("Password", type="password")
-        submit_btn = st.form_submit_button("Log In", use_container_width=True, type="primary")
-        
-        if submit_btn:
-            if check_credentials(user_input, pass_input):
-                st.session_state.authenticated = True
-                st.session_state.username = user_input
-                st.success("Access Granted! Loading workspace...")
-                st.rerun()
-            else:
-                st.error("Invalid Username or Password. Please try again.")
+    tab_login, tab_signup = st.tabs(["🔒 Log In", "📝 Sign Up / Register"])
+    
+    with tab_login:
+        with st.form("login_form"):
+            user_input = st.text_input("Username").strip().lower()
+            pass_input = st.text_input("Password", type="password")
+            submit_login = st.form_submit_button("Sign In", use_container_width=True, type="primary")
+            
+            if submit_login:
+                if verify_user(user_input, pass_input):
+                    st.session_state.authenticated = True
+                    st.session_state.username = user_input
+                    st.success("Access Granted! Loading your workspace...")
+                    st.rerun()
+                else:
+                    st.error("Invalid Username or Password. Please try again.")
+                    
+    with tab_signup:
+        with st.form("signup_form"):
+            new_user = st.text_input("Choose Username").strip().lower()
+            new_pass = st.text_input("Choose Password", type="password")
+            confirm_pass = st.text_input("Confirm Password", type="password")
+            submit_signup = st.form_submit_button("Create My Account", use_container_width=True)
+            
+            if submit_signup:
+                if new_pass != confirm_pass:
+                    st.error("Passwords do not match. Please verify.")
+                elif len(new_pass) < 4:
+                    st.error("Password must be at least 4 characters long.")
+                else:
+                    success, msg = create_user(new_user, new_pass)
+                    if success:
+                        st.success(msg)
+                    else:
+                        st.error(msg)
 
-# --- The Firewall Gate ---
+# Active Gateway Shield
 if not st.session_state.authenticated:
-    show_login_screen()
-    st.stop()  # Strictly stops running the rest of the file until authorized!
+    show_auth_portal()
+    st.stop()
 
 # =============================================================================
-# 3. User-Isolated Persistent File History Helpers
+# 4. User-Isolated Persistent File History Helpers
 # =============================================================================
-# Dynamically locks history file paths to the specific authenticated username
 HISTORY_FILE = f"query_history_{st.session_state.username}.txt"
 
 def save_query_to_file(query_text: str):
@@ -181,7 +249,7 @@ def render_copy_button(text_to_copy: str, element_key: str):
     st.markdown('</div>', unsafe_allow_html=True)
 
 # =============================================================================
-# 4. Workspace Main Page Layout Setup
+# 5. Workspace Main Page Layout Setup
 # =============================================================================
 col1, col2 = st.columns([1, 4]) 
 with col1:
@@ -215,12 +283,11 @@ if api_key:
         st.error(f"Failed to initialize AI client: {e}")
 
 # =============================================================================
-# 5. Sidebar Panels (Workspace Mode)
+# 6. Sidebar Panels (Workspace Mode)
 # =============================================================================
 with st.sidebar:
     st.markdown(f"👤 Account: **{st.session_state.username}**")
     
-    # Fully functional logout mechanism
     if st.button("Log Out", type="secondary", use_container_width=True):
         st.session_state.authenticated = False
         st.session_state.username = ""
@@ -267,7 +334,7 @@ with st.sidebar:
         st.rerun()
 
 # =============================================================================
-# 6. Application Core Context Router
+# 7. Application Core Context Router
 # =============================================================================
 if app_mode == "💬 Text Chat":
     for idx, message in enumerate(st.session_state.messages):
