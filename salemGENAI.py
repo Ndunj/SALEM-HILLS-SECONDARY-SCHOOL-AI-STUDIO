@@ -13,7 +13,7 @@ import docx
 # =============================================================================
 st.set_page_config(page_title="SALEM GENAI", page_icon="🤖", layout="centered")
 
-# --- CSS Styling for Copy Button Alignment ---
+# --- CSS Styling for Layout Elements ---
 st.markdown("""
     <style>
     /* Aligns the HTML container perfectly to the right side underneath chat messages */
@@ -22,6 +22,12 @@ st.markdown("""
         justify-content: flex-end;
         margin-top: -8px;
         margin-bottom: 10px;
+    }
+    /* Simple styling rule to cut off ultra-long prompt titles in the sidebar with ellipses (...) */
+    .stButton>button {
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        overflow: hidden;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -123,7 +129,6 @@ def extract_text_from_file(uploaded_file) -> str:
 
 def render_copy_button(text_to_copy: str, element_key: str):
     """Renders a small JavaScript-driven copy icon button aligned to the right."""
-    # Clean the string safely for JavaScript insertion
     safe_text = text_to_copy.replace('\\', '\\\\').replace('`', '\\`').replace('$', '\\$')
     
     html_code = f"""
@@ -142,7 +147,6 @@ def render_copy_button(text_to_copy: str, element_key: str):
             transition: all 0.2s;
         " onmouseover="this.style.color='#000'; this.style.background='#f0f2f6'" 
            onmouseout="this.style.color='#6c757d'; this.style.background='none'">
-            <!-- SVG Clipboard Icon -->
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             <span id="label_{element_key}">Copy Prompt</span>
         </button>
@@ -171,7 +175,17 @@ def render_copy_button(text_to_copy: str, element_key: str):
     st.markdown('</div>', unsafe_allow_html=True)
 
 # =============================================================================
-# 2. Sidebar Configuration
+# 2. Session State Initialization
+# =============================================================================
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+# Using a persistent placeholder text variable so history links can populate the text entry window
+if "input_value" not in st.session_state:
+    st.session_state.input_value = ""
+
+# =============================================================================
+# 3. Sidebar Configuration (Left Panel)
 # =============================================================================
 with st.sidebar:
     st.header("Configuration")
@@ -192,9 +206,36 @@ with st.sidebar:
         )
     st.divider()
     
+    # --- INTERACTIVE QUERY HISTORY ZONE ---
+    if app_mode == "💬 Text Chat":
+        st.subheader("Query History")
+        
+        # Filter all historical messages submitted by the user
+        user_prompts = []
+        for msg in st.session_state.messages:
+            if msg["role"] == "user":
+                # Strip out the file path formatting to get the clean prompt text string
+                clean_string = msg["content"].split("\n\n")[-1] if "📄 *Attached file:" in msg["content"] else msg["content"]
+                if clean_string not in user_prompts:
+                    user_prompts.append(clean_string)
+        
+        if user_prompts:
+            for i, prompt in enumerate(user_prompts):
+                # Slice prompt text to 30 characters maximum to keep the layout tidy
+                short_display = prompt[:30] + "..." if len(prompt) > 30 else prompt
+                
+                # Render history selections as individual buttons. Clicking one loads it into the entry widget.
+                if st.button(f"💬 {short_display}", key=f"hist_btn_{i}", use_container_width=True):
+                    st.session_state.input_value = prompt
+                    st.rerun()
+        else:
+            st.info("No queries sent yet.")
+            
+        st.divider()
+
     if app_mode == "💬 Text Chat":
         st.subheader("Export Conversation")
-        has_messages = len(st.session_state.get("messages", [])) > 0
+        has_messages = len(st.session_state.messages) > 0
         try:
             pdf_bytes = generate_pdf(st.session_state.messages) if has_messages else b""
             st.download_button(
@@ -211,6 +252,7 @@ with st.sidebar:
         
     if st.button("Clear App History / Cache"):
         st.session_state.messages = []
+        st.session_state.input_value = ""
         st.rerun()
 
 # --- SECURE KEY HANDLING ---
@@ -218,9 +260,6 @@ if "GEMINI_API_KEY" in st.secrets:
     api_key = st.secrets["GEMINI_API_KEY"]
 else:
     api_key = None
-
-if "messages" not in st.session_state:
-    st.session_state.messages = []
 
 client = None
 if api_key:
@@ -237,9 +276,7 @@ if app_mode == "💬 Text Chat":
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
         
-        # Inject the copy feature right below user prompts to the right
         if message["role"] == "user":
-            # Extract clean string text even if it has a document badge prefix
             raw_text = message["content"].split("\n\n")[-1] if "📄 *Attached file:" in message["content"] else message["content"]
             render_copy_button(raw_text, f"hist_{idx}")
 
@@ -254,9 +291,17 @@ if app_mode == "💬 Text Chat":
         label_visibility="collapsed"
     )
 
+# Use dynamic context placeholder configuration to feed history selection straight to input
 placeholder_text = "Ask SALEM anything..."
-if user_input := st.chat_input(placeholder_text):
+user_input = st.chat_input(placeholder_text, key="chat_input_box")
 
+# Handle text selection activation routing when history items are clicked
+if st.session_state.input_value and not user_input:
+    user_input = st.session_state.input_value
+    # Instantly clear values out so the interface doesn't get locked permanently into this historical selection loop
+    st.session_state.input_value = ""
+
+if user_input:
     if not api_key:
         st.warning("Please provide a valid Gemini API Key in the sidebar secrets configuration to start.")
         st.stop()
@@ -276,9 +321,7 @@ if user_input := st.chat_input(placeholder_text):
         with st.chat_message("user"):
             st.markdown(display_prompt)
         
-        # Render the copy button immediately under the newly minted prompt
         render_copy_button(user_input, "live_new")
-
         st.session_state.messages.append({"role": "user", "content": display_prompt})
 
         formatted_history = []
