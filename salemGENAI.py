@@ -30,12 +30,30 @@ st.markdown("""
         white-space: nowrap;
         overflow: hidden;
     }
+    
+    /* Pulsating Blue Glow Title Styling */
     .welcome-text {
-        font-size: 15px;
-        color: #4A4A4A;
-        font-weight: 500;
-        margin-bottom: -10px;
-        padding-left: 5px;
+        font-size: 24px;
+        color: #007BFF;
+        font-weight: 600;
+        margin-top: 15px;
+        margin-bottom: 5px;
+        padding: 10px 15px;
+        border-radius: 8px;
+        display: inline-block;
+        animation: pulseBlue 2s infinite ease-in-out;
+    }
+    
+    @keyframes pulseBlue {
+        0% {
+            text-shadow: 0 0 4px rgba(0, 123, 255, 0.2);
+        }
+        50% {
+            text-shadow: 0 0 16px rgba(0, 123, 255, 0.8), 0 0 24px rgba(0, 123, 255, 0.4);
+        }
+        100% {
+            text-shadow: 0 0 4px rgba(0, 123, 255, 0.2);
+        }
     }
     </style>
 """, unsafe_allow_html=True)
@@ -153,7 +171,6 @@ if not st.session_state.authenticated:
 # =============================================================================
 # 4. User-Isolated Persistent File History Helpers
 # =============================================================================
-# Force history filename to use lowercase variant to ensure consistency
 HISTORY_FILE = f"query_history_{st.session_state.username.lower()}.txt"
 
 def save_query_to_file(query_text: str):
@@ -354,9 +371,9 @@ if app_mode == "💬 Text Chat":
 
     uploaded_doc = st.file_uploader("Attach a document (.txt, .pdf, or .docx)", type=["txt", "pdf", "docx"], label_visibility="collapsed")
     
-    # --- DYNAMIC PERSONALIZED GREETING INJECTOR ---
+    # --- ANIMATED PERSONALIZED GREETING INJECTOR ---
     greeting_str = f"Hi, {st.session_state.username}, how do we begin today?"
-    st.markdown(f'<p class="welcome-text">{greeting_str}</p>', unsafe_allow_html=True)
+    st.markdown(f'<div class="welcome-text">{greeting_str}</div>', unsafe_allow_html=True)
     
     user_input = st.chat_input("Ask SALEM anything...")
 
