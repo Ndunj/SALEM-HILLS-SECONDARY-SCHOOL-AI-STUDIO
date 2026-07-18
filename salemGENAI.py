@@ -371,9 +371,11 @@ if app_mode == "💬 Text Chat":
 
     uploaded_doc = st.file_uploader("Attach a document (.txt, .pdf, or .docx)", type=["txt", "pdf", "docx"], label_visibility="collapsed")
     
-    # --- ANIMATED PERSONALIZED GREETING INJECTOR ---
-    greeting_str = f"Hi, {st.session_state.username}, how do we begin today?"
-    st.markdown(f'<div class="welcome-text">{greeting_str}</div>', unsafe_allow_html=True)
+    # --- CONDITIONAL PERSONALIZED GREETING INJECTOR ---
+    # Only displays the greeting if no text exchange has occurred yet
+    if len(st.session_state.messages) == 0:
+        greeting_str = f"Hi, {st.session_state.username}, how do we begin today?"
+        st.markdown(f'<div class="welcome-text">{greeting_str}</div>', unsafe_allow_html=True)
     
     user_input = st.chat_input("Ask SALEM anything...")
 
