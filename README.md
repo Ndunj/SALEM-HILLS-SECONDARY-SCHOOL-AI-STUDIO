@@ -1,4 +1,4 @@
-# 🏫 SALEM HILLS INT'L SCHOOL AI STUDIO
+# 🏫 SALEM HILLS INT'L SCHOOL AI
 
 An advanced, expert educational assistant web application custom-built for Salem Hills International School. Powered by **Google Gemini 2.5 Flash**, this workspace features tailored pedagogical instruction parameters and dynamic document compilation capabilities.
 
