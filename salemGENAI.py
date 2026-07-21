@@ -8,7 +8,7 @@ import json
 import os
 import sqlite3
 import hashlib
-from fpdf import FPDF 
+from fpdf import FPDF
 import pypdf
 import docx
 
@@ -16,46 +16,45 @@ import docx
 # 1. Page Configuration & Custom Styles
 # =============================================================================
 st.set_page_config(page_title="SALEM GENAI", page_icon="🤖", layout="centered")
-
 st.markdown("""
-    <style>
-    .copy-container-wrapper {
-        display: flex;
-        justify-content: flex-end;
-        margin-top: -8px;
-        margin-bottom: 10px;
+<style>
+.copy-container-wrapper {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: -8px;
+    margin-bottom: 10px;
+}
+.stButton>button {
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+/* Pulsating Blue Glow Title Styling */
+.welcome-text {
+    font-size: 24px;
+    color: #007BFF;
+    font-weight: 600;
+    margin-top: 15px;
+    margin-bottom: 5px;
+    padding: 10px 15px;
+    border-radius: 8px;
+    display: inline-block;
+    animation: pulseBlue 2s infinite ease-in-out;
+}
+
+@keyframes pulseBlue {
+    0% {
+        text-shadow: 0 0 4px rgba(0, 123, 255, 0.2);
     }
-    .stButton>button {
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        overflow: hidden;
+    50% {
+        text-shadow: 0 0 16px rgba(0, 123, 255, 0.8), 0 0 24px rgba(0, 123, 255, 0.4);
     }
-    
-    /* Pulsating Blue Glow Title Styling */
-    .welcome-text {
-        font-size: 24px;
-        color: #007BFF;
-        font-weight: 600;
-        margin-top: 15px;
-        margin-bottom: 5px;
-        padding: 10px 15px;
-        border-radius: 8px;
-        display: inline-block;
-        animation: pulseBlue 2s infinite ease-in-out;
+    100% {
+        text-shadow: 0 0 4px rgba(0, 123, 255, 0.2);
     }
-    
-    @keyframes pulseBlue {
-        0% {
-            text-shadow: 0 0 4px rgba(0, 123, 255, 0.2);
-        }
-        50% {
-            text-shadow: 0 0 16px rgba(0, 123, 255, 0.8), 0 0 24px rgba(0, 123, 255, 0.4);
-        }
-        100% {
-            text-shadow: 0 0 4px rgba(0, 123, 255, 0.2);
-        }
-    }
-    </style>
+}
+</style>
 """, unsafe_allow_html=True)
 
 # =============================================================================
@@ -68,10 +67,10 @@ def init_db():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     c.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            username TEXT PRIMARY KEY,
-            password_hash TEXT NOT NULL
-        )
+    CREATE TABLE IF NOT EXISTS users (
+        username TEXT PRIMARY KEY,
+        password_hash TEXT NOT NULL
+    )
     ''')
     conn.commit()
     conn.close()
@@ -85,7 +84,7 @@ def create_user(username, password):
     username = username.strip().lower()
     if not username or not password:
         return False, "Username and password cannot be empty."
-    
+
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     try:
@@ -99,14 +98,14 @@ def create_user(username, password):
         conn.close()
 
 def verify_user(username, password):
-    """Checks credentials against the stored records."""
-    username = username.strip().lower()
+    """Checks credentials against stored records securely."""
+    username = username.strip().lower() # ENSURE LOWERCASE TO MATCH STORAGE
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     c.execute("SELECT password_hash FROM users WHERE username = ?", (username,))
     row = c.fetchone()
     conn.close()
-    
+
     if row and row[0] == hash_password(password):
         return True
     return False
@@ -124,11 +123,11 @@ if "username" not in st.session_state:
 
 def show_auth_portal():
     """Renders a clean tabbed UI for Login vs Registration."""
-    st.markdown("<h2 style='text-align: center;'>🏫 SALEM HILLS INT'L SCHOOL AI</h2>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: grey;'>Authenticate or sign up below to enter the workspace.</p>", unsafe_allow_html=True)
+    st.markdown("### 🏫 SALEM HILLS INT'L SCHOOL AI", unsafe_allow_html=True)
+    st.markdown("Authenticate or sign up below to enter the workspace.", unsafe_allow_html=True)
     
     tab_login, tab_signup = st.tabs(["🔒 Log In", "📝 Sign Up / Register"])
-    
+
     with tab_login:
         with st.form("login_form"):
             user_input = st.text_input("Username").strip()
@@ -138,7 +137,7 @@ def show_auth_portal():
             if submit_login:
                 if verify_user(user_input, pass_input):
                     st.session_state.authenticated = True
-                    st.session_state.username = user_input.strip()
+                    st.session_state.username = user_input.strip().lower()
                     st.success("Access Granted! Loading your workspace...")
                     st.rerun()
                 else:
@@ -197,8 +196,8 @@ def clear_file_history():
 # =============================================================================
 def clean_text(text: str) -> str:
     replacements = {
-        '\u201c': '"', '\u201d': '"', '\u2018': "'", '\u2019': "'",  
-        '\u2013': '-', '\u2014': '-', '\u2022': '*',                  
+        '\u201c': '"', '\u201d': '"', '\u2018': "'", '\u2019': "'",
+        '\u2013': '-', '\u2014': '-', '\u2022': '*',
     }
     for original, replacement in replacements.items():
         text = text.replace(original, replacement)
@@ -211,7 +210,7 @@ def generate_chat_pdf(messages) -> bytes:
     pdf.set_font("Helvetica", style="B", size=14)
     pdf.cell(0, 10, txt="SALEM HILLS INT'L SCHOOL CHAT LOG", ln=True, align="C")
     pdf.ln(5)
-    
+
     for msg in messages:
         role = "Student / User" if msg["role"] == "user" else "AI Assistant"
         pdf.set_font("Helvetica", style="B", size=10)
@@ -244,22 +243,16 @@ def extract_text_from_file(uploaded_file) -> str:
     return ""
 
 def render_copy_button(text_to_copy: str, element_key: str):
-    safe_text = text_to_copy.replace('\\', '\\\\').replace('`', '\\`').replace('$', '\\$')
+    safe_text = json.dumps(text_to_copy)
     html_code = f"""
-    <div style="display: flex; justify-content: flex-end; font-family: sans-serif;">
-        <button onclick="copyToClipboard()" id="btn_{element_key}" style="
-            background: none; border: none; color: #6c757d; cursor: pointer;
-            display: flex; align-items: center; gap: 4px; font-size: 12px;
-            padding: 4px 8px; border-radius: 4px; transition: all 0.2s;
-        " onmouseover="this.style.color='#000'; this.style.background='#f0f2f6'" 
-           onmouseout="this.style.color='#6c757d'; this.style.background='none'">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+    <div class="copy-container-wrapper">
+        <button id="btn_{element_key}" onclick="copyToClipboard()" style="background: none; border: 1px solid #ccc; border-radius: 4px; padding: 2px 8px; cursor: pointer; color: #6c757d; font-size: 12px;">
             <span id="label_{element_key}">Copy Prompt</span>
         </button>
     </div>
     <script>
     function copyToClipboard() {{
-        const text = `{safe_text}`;
+        const text = {safe_text};
         navigator.clipboard.writeText(text).then(() => {{
             const label = document.getElementById('label_{element_key}');
             const btn = document.getElementById('btn_{element_key}');
@@ -269,17 +262,15 @@ def render_copy_button(text_to_copy: str, element_key: str):
     }}
     </script>
     """
-    st.markdown('<div class="copy-container-wrapper">', unsafe_allow_html=True)
-    components.html(html_code, height=30)
-    st.markdown('</div>', unsafe_allow_html=True)
+    components.html(html_code, height=35)
 
 # =============================================================================
 # 5. Workspace Main Page Layout Setup
 # =============================================================================
-col1, col2 = st.columns([1, 4]) 
+col1, col2 = st.columns([1, 4])
 with col1:
     try:
-        st.image("salemlogo.png", width=80) 
+        st.image("salemlogo.png", width=80)
     except Exception:
         st.write("🏫")
 with col2:
@@ -312,7 +303,7 @@ if api_key:
 # =============================================================================
 with st.sidebar:
     st.markdown(f"👤 Account: **{st.session_state.username}**")
-    
+
     if st.button("Log Out", type="secondary", use_container_width=True):
         st.session_state.authenticated = False
         st.session_state.username = ""
@@ -348,7 +339,13 @@ with st.sidebar:
         st.divider()
         st.subheader("Export Conversation")
         has_messages = len(st.session_state.messages) > 0
-        if st.download_button(label="📥 Download Chat as PDF", data=generate_chat_pdf(st.session_state.messages) if has_messages else b"", file_name="chat_transcript.pdf", mime="application/pdf", disabled=not has_messages):
+        if st.download_button(
+            label="📥 Download Chat as PDF", 
+            data=generate_chat_pdf(st.session_state.messages) if has_messages else b"", 
+            file_name="chat_transcript.pdf", 
+            mime="application/pdf", 
+            disabled=not has_messages
+        ):
             st.success("Log Transcribed!")
 
     st.divider()
@@ -370,13 +367,12 @@ if app_mode == "💬 Text Chat":
             render_copy_button(raw_text, f"hist_{idx}")
 
     uploaded_doc = st.file_uploader("Attach a document (.txt, .pdf, or .docx)", type=["txt", "pdf", "docx"], label_visibility="collapsed")
-    
+
     # --- CONDITIONAL PERSONALIZED GREETING INJECTOR ---
-    # Only displays the greeting if no text exchange has occurred yet
     if len(st.session_state.messages) == 0:
-        greeting_str = f"Hi, {st.session_state.username}, how do we begin today?"
+        greeting_str = f"Hi, {st.session_state.username.capitalize()}, how do we begin today?"
         st.markdown(f'<div class="welcome-text">{greeting_str}</div>', unsafe_allow_html=True)
-    
+
     user_input = st.chat_input("Ask SALEM anything...")
 
     if st.session_state.input_value and not user_input:
