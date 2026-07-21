@@ -58,38 +58,51 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =============================================================================
-# 2. Database Initialization (Lightweight User Storage)
+# 2. Database Initialization & Schema Upgrade
 # =============================================================================
 DB_FILE = "users.db"
 
 def init_db():
-    """Creates the users table if it doesn't already exist."""
+    """Creates or updates the users table with recovery support."""
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     c.execute('''
     CREATE TABLE IF NOT EXISTS users (
         username TEXT PRIMARY KEY,
-        password_hash TEXT NOT NULL
+        password_hash TEXT NOT NULL,
+        security_question TEXT,
+        security_answer_hash TEXT
     )
     ''')
+    
+    # Check if table needs columns from earlier versions
+    c.execute("PRAGMA table_info(users)")
+    columns = [col[1] for col in c.fetchall()]
+    if "security_question" not in columns:
+        c.execute("ALTER TABLE users ADD COLUMN security_question TEXT")
+    if "security_answer_hash" not in columns:
+        c.execute("ALTER TABLE users ADD COLUMN security_answer_hash TEXT")
+        
     conn.commit()
     conn.close()
 
-def hash_password(password: str) -> str:
-    """Helper to encrypt passwords securely before saving to database."""
-    return hashlib.sha256(password.encode()).hexdigest()
+def hash_data(data: str) -> str:
+    """Helper to encrypt string values securely."""
+    return hashlib.sha256(data.strip().lower().encode()).hexdigest()
 
-def create_user(username, password):
-    """Inserts a new user into the database securely."""
+def create_user(username, password, security_q, security_a):
+    """Inserts a new user into the database securely with recovery credentials."""
     username = username.strip().lower()
-    if not username or not password:
-        return False, "Username and password cannot be empty."
+    if not username or not password or not security_q or not security_a:
+        return False, "All fields (including security question and answer) are required."
 
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     try:
-        c.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)", 
-                  (username, hash_password(password)))
+        c.execute(
+            "INSERT INTO users (username, password_hash, security_question, security_answer_hash) VALUES (?, ?, ?, ?)", 
+            (username, hash_data(password), security_q, hash_data(security_a))
+        )
         conn.commit()
         return True, "Account created successfully! Please log in."
     except sqlite3.IntegrityError:
@@ -99,18 +112,45 @@ def create_user(username, password):
 
 def verify_user(username, password):
     """Checks credentials against stored records securely."""
-    username = username.strip().lower() # ENSURE LOWERCASE TO MATCH STORAGE
+    username = username.strip().lower()
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     c.execute("SELECT password_hash FROM users WHERE username = ?", (username,))
     row = c.fetchone()
     conn.close()
 
-    if row and row[0] == hash_password(password):
+    if row and row[0] == hash_data(password):
         return True
     return False
 
-# Trigger database generation setup
+def get_user_security_question(username):
+    """Retrieves the security question for a given username."""
+    username = username.strip().lower()
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("SELECT security_question FROM users WHERE username = ?", (username,))
+    row = c.fetchone()
+    conn.close()
+    return row[0] if row else None
+
+def reset_password_with_answer(username, security_a, new_password):
+    """Resets password if security answer matches."""
+    username = username.strip().lower()
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("SELECT security_answer_hash FROM users WHERE username = ?", (username,))
+    row = c.fetchone()
+    
+    if not row or row[0] != hash_data(security_a):
+        conn.close()
+        return False, "Incorrect security answer."
+        
+    c.execute("UPDATE users SET password_hash = ? WHERE username = ?", (hash_data(new_password), username))
+    conn.commit()
+    conn.close()
+    return True, "Password successfully reset! You can now log in."
+
+# Trigger database setup
 init_db()
 
 # =============================================================================
@@ -122,12 +162,13 @@ if "username" not in st.session_state:
     st.session_state.username = ""
 
 def show_auth_portal():
-    """Renders a clean tabbed UI for Login vs Registration."""
+    """Renders a clean tabbed UI for Login, Registration, and Recovery."""
     st.markdown("### 🏫 SALEM HILLS INT'L SCHOOL AI", unsafe_allow_html=True)
-    st.markdown("Authenticate or sign up below to enter the workspace.", unsafe_allow_html=True)
+    st.markdown("Authenticate, sign up, or recover your password below.", unsafe_allow_html=True)
     
-    tab_login, tab_signup = st.tabs(["🔒 Log In", "📝 Sign Up / Register"])
+    tab_login, tab_signup, tab_recovery = st.tabs(["🔒 Log In", "📝 Sign Up", "🔑 Forgot Password"])
 
+    # --- TAB 1: LOGIN ---
     with tab_login:
         with st.form("login_form"):
             user_input = st.text_input("Username").strip()
@@ -142,12 +183,27 @@ def show_auth_portal():
                     st.rerun()
                 else:
                     st.error("Invalid Username or Password. Please try again.")
-                    
+
+    # --- TAB 2: SIGN UP ---
     with tab_signup:
         with st.form("signup_form"):
             new_user = st.text_input("Choose Username").strip()
             new_pass = st.text_input("Choose Password", type="password")
             confirm_pass = st.text_input("Confirm Password", type="password")
+            
+            st.markdown("---")
+            st.caption("Setup Password Recovery Credentials:")
+            security_q = st.selectbox(
+                "Select a Security Question", 
+                [
+                    "What was the name of your first school?",
+                    "What is your mother's maiden name?",
+                    "What is the title of your favorite book?",
+                    "In what city were you born?"
+                ]
+            )
+            security_a = st.text_input("Answer to Security Question", type="password")
+            
             submit_signup = st.form_submit_button("Create My Account", use_container_width=True)
             
             if submit_signup:
@@ -155,12 +211,43 @@ def show_auth_portal():
                     st.error("Passwords do not match. Please verify.")
                 elif len(new_pass) < 4:
                     st.error("Password must be at least 4 characters long.")
+                elif not security_a.strip():
+                    st.error("Please provide an answer to your security question.")
                 else:
-                    success, msg = create_user(new_user, new_pass)
+                    success, msg = create_user(new_user, new_pass, security_q, security_a)
                     if success:
                         st.success(msg)
                     else:
                         st.error(msg)
+
+    # --- TAB 3: FORGOT PASSWORD / RECOVERY ---
+    with tab_recovery:
+        st.caption("Recover your account using your security question.")
+        recovery_user = st.text_input("Enter your Username for recovery", key="rec_user").strip()
+        
+        if recovery_user:
+            question = get_user_security_question(recovery_user)
+            if question:
+                with st.form("recovery_form"):
+                    st.info(f"**Security Question:** {question}")
+                    sec_answer = st.text_input("Your Answer", type="password")
+                    reset_pass = st.text_input("New Password", type="password")
+                    confirm_reset_pass = st.text_input("Confirm New Password", type="password")
+                    submit_reset = st.form_submit_button("Reset Password", type="primary", use_container_width=True)
+                    
+                    if submit_reset:
+                        if reset_pass != confirm_reset_pass:
+                            st.error("New passwords do not match.")
+                        elif len(reset_pass) < 4:
+                            st.error("Password must be at least 4 characters long.")
+                        else:
+                            success, msg = reset_password_with_answer(recovery_user, sec_answer, reset_pass)
+                            if success:
+                                st.success(msg)
+                            else:
+                                st.error(msg)
+            else:
+                st.error("Username not found.")
 
 # Active Gateway Shield
 if not st.session_state.authenticated:
